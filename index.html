@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OG Preview - URL Metadata Viewer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #10b981;
+        }
+        
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            background: #1f2937;
+            color: #fff;
+            font-size: 1rem;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #10b981;
+        }
+        
+        button {
+            padding: 0.75rem 1.5rem;
+            background: #10b981;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #059669;
+        }
+        
+        button:disabled {
+            background: #4b5563;
+            cursor: not-allowed;
+        }
+        
+        .preview-card {
+            background: #1f2937;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #374151;
+        }
+        
+        .preview-image {
+            width: 100%;
+            height: 200px;
+            background: #374151;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #9ca3af;
+        }
+        
+        .preview-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .preview-content {
+            padding: 1rem;
+        }
+        
+        .preview-site {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+        
+        .preview-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: #fff;
+        }
+        
+        .preview-description {
+            font-size: 0.875rem;
+            color: #9ca3af;
+            line-height: 1.4;
+        }
+        
+        .error {
+            background: #7f1d1d;
+            color: #fca5a5;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .meta-list {
+            background: #1f2937;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 2rem;
+            border: 1px solid #374151;
+        }
+        
+        .meta-list h3 {
+            font-size: 0.875rem;
+            color: #9ca3af;
+            margin-bottom: 0.75rem;
+        }
+        
+        .meta-item {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+            word-break: break-all;
+        }
+        
+        .meta-label {
+            color: #10b981;
+            min-width: 100px;
+        }
+        
+        .meta-value {
+            color: #d1d5db;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #9ca3af;
+        }
+        
+        .pro-badge {
+            display: inline-block;
+            background: #10b981;
+            color: #fff;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OG Preview <span class="pro-badge">FREE</span></h1>
+        <p class="subtitle">Preview how your links look on social media</p>
+        
+        <div class="input-group">
+            <input type="url" id="urlInput" placeholder="https://example.com" />
+            <button id="previewBtn">Preview</button>
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div id="preview" style="display: none;">
+            <div class="preview-card">
+                <div class="preview-image" id="previewImage">
+                    No image
+                </div>
+                <div class="preview-content">
+                    <div class="preview-site" id="previewSite"></div>
+                    <div class="preview-title" id="previewTitle"></div>
+                    <div class="preview-description" id="previewDescription"></div>
+                </div>
+            </div>
+            
+            <div class="meta-list">
+                <h3>Raw Metadata</h3>
+                <div id="metaList"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const CORS_PROXY = 'https://api.allorigins.win/get?url=';
+        
+        const urlInput = document.getElementById('urlInput');
+        const previewBtn = document.getElementById('previewBtn');
+        const errorDiv = document.getElementById('error');
+        const previewDiv = document.getElementById('preview');
+        
+        previewBtn.addEventListener('click', fetchMetadata);
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') fetchMetadata();
+        });
+        
+        async function fetchMetadata() {
+            const url = urlInput.value.trim();
+            if (!url) return;
+            
+            // Add https if missing
+            let finalUrl = url;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                finalUrl = 'https://' + url;
+            }
+            
+            previewBtn.disabled = true;
+            previewBtn.textContent = 'Loading...';
+            errorDiv.style.display = 'none';
+            previewDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch(CORS_PROXY + encodeURIComponent(finalUrl));
+                const data = await response.json();
+                
+                if (!data.contents) {
+                    throw new Error('Could not fetch URL');
+                }
+                
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(data.contents, 'text/html');
+                
+                const meta = {
+                    ogTitle: getMetaContent(doc, 'og:title') || getMetaContent(doc, 'twitter:title') || doc.title,
+                    ogDescription: getMetaContent(doc, 'og:description') || getMetaContent(doc, 'twitter:description'),
+                    ogImage: getMetaContent(doc, 'og:image') || getMetaContent(doc, 'twitter:image'),
+                    ogSiteName: getMetaContent(doc, 'og:site_name'),
+                    ogUrl: getMetaContent(doc, 'og:url'),
+                    twitterCard: getMetaContent(doc, 'twitter:card'),
+                };
+                
+                // Handle relative image URLs
+                if (meta.ogImage && !meta.ogImage.startsWith('http')) {
+                    const urlObj = new URL(finalUrl);
+                    meta.ogImage = urlObj.origin + meta.ogImage;
+                }
+                
+                renderPreview(meta, finalUrl);
+                
+            } catch (err) {
+                errorDiv.textContent = 'Error: ' + err.message;
+                errorDiv.style.display = 'block';
+            } finally {
+                previewBtn.disabled = false;
+                previewBtn.textContent = 'Preview';
+            }
+        }
+        
+        function getMetaContent(doc, name) {
+            const meta = doc.querySelector(`meta[property="${name}"]`) || 
+                        doc.querySelector(`meta[name="${name}"]`);
+            return meta ? meta.getAttribute('content') : null;
+        }
+        
+        function renderPreview(meta, url) {
+            // Image
+            const imageDiv = document.getElementById('previewImage');
+            if (meta.ogImage) {
+                imageDiv.innerHTML = `<img src="${meta.ogImage}" alt="Preview" onerror="this.parentElement.innerHTML='Image failed to load'">`;
+            } else {
+                imageDiv.textContent = 'No image';
+            }
+            
+            // Site name
+            document.getElementById('previewSite').textContent = 
+                meta.ogSiteName || new URL(url).hostname;
+            
+            // Title
+            document.getElementById('previewTitle').textContent = 
+                meta.ogTitle || 'No title';
+            
+            // Description
+            document.getElementById('previewDescription').textContent = 
+                meta.ogDescription || 'No description';
+            
+            // Raw meta list
+            const metaList = document.getElementById('metaList');
+            const items = [
+                ['URL', url],
+                ['og:title', meta.ogTitle],
+                ['og:description', meta.ogDescription],
+                ['og:image', meta.ogImage],
+                ['og:site_name', meta.ogSiteName],
+                ['twitter:card', meta.twitterCard],
+            ].filter(([_, v]) => v);
+            
+            metaList.innerHTML = items.map(([label, value]) => `
+                <div class="meta-item">
+                    <span class="meta-label">${label}:</span>
+                    <span class="meta-value">${value}</span>
+                </div>
+            `).join('');
+            
+            previewDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
