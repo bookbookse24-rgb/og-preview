@@ -7,6 +7,14 @@ A simple tool to preview Open Graph meta tags from any URL. Built for developers
 - Preview title, description, image, and site name
 - Mobile and desktop preview
 - Copy the previewed image URL
+- 100% free, no signup required
+
+## Pricing
+- **Free**: Full features
+- Pro version with bulk preview, API access coming soon
+
+## Live Demo
+Deployed at: https://og-preview.netlify.app
 
 ## Tech Stack
 - Single HTML file with vanilla JS
